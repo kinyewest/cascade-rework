@@ -32,18 +32,27 @@ Format: `## [version] - YYYY-MM-DD`
 - `on_presence_update` now dispatches `Presence` entity (was raw dict)
 - `on_user_update` now dispatches `ClientUser` (was dict)
 - `on_reaction_add/remove` now dispatch `Reaction` entity (was dict)
+- **Webhook execution**: `webhook.send()`, `webhook.edit_message()`, `webhook.delete_message()`, `webhook.fetch_message()` methods
+- **Thread management**: `channel.create_thread()`, `channel.add_member()`, `channel.remove_member()`, `channel.join()`, `channel.leave()` methods
+- **Bulk message operations**: `channel.bulk_delete(message_ids)` — delete up to 100 messages at once
+- **Channel permissions**: `channel.edit_permissions()`, `channel.delete_permissions()` for managing permission overwrites
+- **Guild widget**: `guild.fetch_widget()`, `guild.fetch_widget_settings()`, `guild.edit_widget()` methods
+- **Guild vanity URL**: `guild.fetch_vanity_url()` method
+- **Voice regions**: `session.fetch_voice_regions()` returns list of `VoiceRegion` objects
+- **Read all shortcut**: `session.ack_all()` — mark all guilds as read
 
 ### Changed
 - **Discord version strings updated** (critical for avoiding detection):
-  - Electron: `42.0.0` (was `33.0.2`)
-  - Chrome: `136.0.0.0` (was `130.0.0.0`)
-  - Desktop app version (Windows): `1.0.9262` (was `1.0.9175`)
-  - Desktop app version (macOS): `0.0.320` (was `0.0.303`)
-  - Desktop app version (Linux): `0.0.72` (was `0.0.71`)
-  - `client_build_number`: `635180` (was `633883`)
-  - `Sec-Ch-Ua`: Updated to Chrome 136
+  - Electron: `42.0.0` (unchanged)
+  - Chrome: `148.0.0.0` (was `136.0.0.0`) — Chromium 148 in Electron 42
+  - Desktop app version (Windows): `1.0.9266` (was `1.0.9262`)
+  - Desktop app version (macOS): `0.0.320` (unchanged)
+  - Desktop app version (Linux): `0.0.72` (unchanged)
+  - `client_build_number`: `635180` (unchanged)
+  - `Sec-Ch-Ua`: Updated to Chrome 148
 - `fetch_read_states()` now uses correct `/users/@me/read-states/v2` endpoint
 - All version strings updated in `rest.py`, `shard.py`, and `spoof/platforms.py`
+- `Webhook.from_dict()` now accepts optional `session` parameter
 
 ### Fixed
 - Removed `br` (Brotli) from `Accept-Encoding` header — was causing 400 errors
