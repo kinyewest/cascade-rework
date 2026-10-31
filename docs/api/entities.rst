@@ -447,3 +447,272 @@ Team
      - List of :class:`~cascade.entities.team.TeamMember`
    * - ``owner``
      - The owner as a ``TeamMember``
+
+Attachment
+----------
+
+.. code-block:: python
+
+   for attachment in message.attachments:
+       print(f'{attachment.filename}: {attachment.size} bytes')
+       if attachment.is_image():
+           print(f'  Image: {attachment.width}x{attachment.height}')
+       if attachment.spoiler:
+           print('  SPOILER!')
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Attachment ID
+   * - ``filename``
+     - File name
+   * - ``size``
+     - Size in bytes
+   * - ``url``
+     - CDN URL
+   * - ``proxy_url``
+     - Proxied CDN URL
+   * - ``height`` / ``width``
+     - Image/video dimensions or ``None``
+   * - ``content_type``
+     - MIME type
+   * - ``ephemeral``
+     - Whether ephemeral
+   * - ``spoiler``
+     - Whether filename starts with ``SPOILER_``
+
+Methods: ``is_image()``, ``is_video()``, ``is_audio()``
+
+Forum Channels
+--------------
+
+**ForumChannel**
+
+.. code-block:: python
+
+   forum = guild.get_channel(forum_id)
+   posts = await forum.fetch_posts()
+   post = await forum.create_post(
+       name='Post Title',
+       content='First message',
+       tags=[tag.id]
+   )
+
+Attributes: ``topic``, ``nsfw``, ``rate_limit_per_user``, ``last_message_id``,
+``parent_id``, ``available_tags`` (list of :class:`ForumTag`).
+
+**ForumPost**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Thread ID
+   * - ``guild_id``
+     - Guild ID
+   * - ``parent_id``
+     - Forum channel ID
+   * - ``name``
+     - Post title
+   * - ``message_count``
+     - Message count
+   * - ``member_count``
+     - Member count
+   * - ``archived``
+     - Whether archived
+   * - ``locked``
+     - Whether locked
+   * - ``applied_tags``
+     - List of tag IDs
+
+**ForumTag**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Tag ID
+   * - ``name``
+     - Tag name
+   * - ``moderated``
+     - Mod-only tag
+   * - ``emoji_id``
+     - Custom emoji ID or ``None``
+   * - ``emoji_name``
+     - Unicode emoji or custom emoji name
+
+Integration
+-----------
+
+.. code-block:: python
+
+   integrations = await session.fetch_integrations(guild_id)
+   for integration in integrations:
+       print(f'{integration.name} ({integration.type})')
+       if integration.enabled:
+           print(f'  Synced: {integration.synced_at}')
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Integration ID
+   * - ``name``
+     - Integration name
+   * - ``type``
+     - Type (e.g. ``'twitch'``, ``'youtube'``)
+   * - ``enabled``
+     - Whether enabled
+   * - ``syncing``
+     - Whether syncing
+   * - ``role_id``
+     - Role ID granted to subscribers
+   * - ``enable_emoticons``
+     - Whether emotes are synced
+   * - ``expire_behavior``
+     - Expiration behavior integer
+   * - ``expire_grace_period``
+     - Grace period in days
+   * - ``user``
+     - :class:`User` who added integration
+   * - ``account``
+     - :class:`IntegrationAccount` object
+   * - ``synced_at``
+     - Last sync timestamp
+   * - ``subscriber_count``
+     - Subscriber count
+   * - ``revoked``
+     - Whether revoked
+   * - ``application``
+     - :class:`IntegrationApplication` or ``None``
+
+GuildPreview
+------------
+
+.. code-block:: python
+
+   preview = await session.fetch_guild_preview(guild_id)
+   print(f'{preview.name}: {preview.approximate_member_count} members')
+   print(f'Features: {preview.features}')
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Guild ID
+   * - ``name``
+     - Guild name
+   * - ``icon`` / ``icon_url``
+     - Icon hash / CDN URL
+   * - ``splash`` / ``splash_url``
+     - Splash hash / CDN URL
+   * - ``discovery_splash`` / ``discovery_splash_url``
+     - Discovery splash hash / URL
+   * - ``emojis``
+     - List of :class:`Emoji` objects
+   * - ``features``
+     - List of feature strings
+   * - ``approximate_member_count``
+     - Approximate member count
+   * - ``approximate_presence_count``
+     - Approximate online count
+   * - ``description``
+     - Guild description
+
+VoiceRegion
+-----------
+
+.. code-block:: python
+
+   regions = await session.fetch_voice_regions()
+   for region in regions:
+       print(f'{region.name} ({region.id}): optimal={region.optimal}')
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``id``
+     - Region ID (e.g. ``'us-west'``)
+   * - ``name``
+     - Human-readable name
+   * - ``optimal``
+     - Whether this is the optimal region
+   * - ``deprecated``
+     - Whether deprecated
+   * - ``custom``
+     - Whether custom region
+
+Note
+----
+
+.. code-block:: python
+
+   note = await session.fetch_note(user_id)
+   print(note.content)
+   
+   await note.edit('New note text')
+   await note.delete()
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``user_id``
+     - User ID this note is about
+   * - ``note``
+     - Note text content
+   * - ``_session``
+     - Session reference (internal)
+
+Methods: ``edit(content)``, ``delete()``
+
+MessageSearchResult
+-------------------
+
+.. code-block:: python
+
+   results = await session.search_messages(
+       guild_id=guild_id,
+       content='search terms',
+       author_id=user_id
+   )
+   
+   for result in results:
+       msg = result.message
+       print(f'{msg.author.name}: {msg.content}')
+       for ctx in result.context_messages:
+           print(f'  context: {ctx.content}')
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Attribute
+     - Description
+   * - ``message``
+     - The matching :class:`Message` object
+   * - ``context_messages``
+     - List of surrounding :class:`Message` objects for context
+   * - ``hit``
+     - Whether this message matched the search query

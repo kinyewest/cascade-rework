@@ -6,6 +6,56 @@ Format: `## [version] - YYYY-MM-DD`
 
 ---
 
+## [0.4.0] - 2026-10-20
+
+### Added
+- **Quests module**: Full quest system support with `QuestClient`, `Quest`, `QuestConfig`, `QuestUserStatus`, `QuestTaskProgress`, `QuestReward`, `ClaimedQuest`
+  - `session.quests` property for lazy-initialized quest client
+  - Safe heartbeat loops with 55-65s intervals and jitter
+  - `run_heartbeat_loop()`, `run_video_quest()` for automated quest completion
+  - Quest enrollment, claim, reward code retrieval
+  - Console quest support
+- **Attachment entity**: `Attachment` object with `is_image()`, `is_video()`, `is_audio()` methods
+- **Forum support**: `ForumChannel`, `ForumPost`, `ForumTag` entities
+- **Integration entity**: `Integration`, `IntegrationAccount`, `IntegrationApplication`
+- **Guild preview**: `GuildPreview` entity and `fetch_guild_preview()` method
+- **Voice regions**: `VoiceRegion` entity and `fetch_voice_regions()` method
+- **Message search**: `MessageSearchResult` entity for search results with context
+- **Note entity**: `Note` with `edit()` and `delete()` methods
+- **MessageBuilder**: Fluent message builder with `content()`, `embed()`, `component()`, `reply()`, `suppress_mentions()`, `tts()`, `suppress_embeds()`, `ephemeral()`, `nonce()`, `sticker()` methods
+- **AllowedMentions**: Mention control with `.none()`, `.all()` factory methods
+- **Rich guild methods**: 15+ new `Guild` methods including `fetch_channels()`, `fetch_member()`, `fetch_bans()`, `fetch_audit_log()`, `fetch_templates()`, `fetch_onboarding()`, `fetch_welcome_screen()`, `fetch_scheduled_events()`, `fetch_invites()`, `fetch_webhooks()`, `fetch_stickers()`, `fetch_emojis()`, `fetch_roles()`, `edit()`
+- **Rich member methods**: `edit()`, `set_nickname()`, `add_role()`, `remove_role()`, `kick()`, `ban()`, `timeout()`, `remove_timeout()`, `send()`, `fetch_profile()`
+- **30+ new REST endpoints**: `bulk_ban()`, `recent_mentions()`, `notes CRUD`, `hypesquad house`, `proto settings`, `join requests`, `member verification`, `greet()`, `forum posts`, `voice channel status`, and more
+- **Gateway events**: `GUILD_BAN_ADD`, `GUILD_BAN_REMOVE`, `GUILD_EMOJIS_UPDATE`, `GUILD_INTEGRATIONS_UPDATE`, `CHANNEL_PINS_UPDATE`, `GUILD_MEMBERS_CHUNK`, `THREAD_LIST_SYNC`, `THREAD_MEMBERS_UPDATE`, `SESSIONS_REPLACE`, `VOICE_CHANNEL_STATUS_UPDATE`, `MESSAGE_REACTION_REMOVE_EMOJI`
+- Message attachments now parse as `Attachment` objects (was raw dicts)
+- `on_presence_update` now dispatches `Presence` entity (was raw dict)
+- `on_user_update` now dispatches `ClientUser` (was dict)
+- `on_reaction_add/remove` now dispatch `Reaction` entity (was dict)
+
+### Changed
+- **Discord version strings updated** (critical for avoiding detection):
+  - Electron: `42.0.0` (was `33.0.2`)
+  - Chrome: `136.0.0.0` (was `130.0.0.0`)
+  - Desktop app version (Windows): `1.0.9262` (was `1.0.9175`)
+  - Desktop app version (macOS): `0.0.320` (was `0.0.303`)
+  - Desktop app version (Linux): `0.0.72` (was `0.0.71`)
+  - `client_build_number`: `635180` (was `633883`)
+  - `Sec-Ch-Ua`: Updated to Chrome 136
+- `fetch_read_states()` now uses correct `/users/@me/read-states/v2` endpoint
+- All version strings updated in `rest.py`, `shard.py`, and `spoof/platforms.py`
+
+### Fixed
+- Removed `br` (Brotli) from `Accept-Encoding` header — was causing 400 errors
+- Fixed `Message.clear_reactions()` missing `await`
+- Fixed missing `datetime` import in `message.py`
+
+### Documentation
+- Added complete quest system documentation (`docs/api/quests.rst`)
+- Added `Attachment`, `ForumChannel/Post/Tag`, `Integration`, `GuildPreview`, `VoiceRegion`, `Note`, `MessageSearchResult` to entities docs
+- Added `MessageBuilder` and `AllowedMentions` to utils docs
+- Updated index with quests section
+
 ## [0.3.1] - 2026-10-20
 
 ### Fixed

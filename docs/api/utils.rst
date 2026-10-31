@@ -1,6 +1,62 @@
 Utilities
 =========
 
+MessageBuilder
+--------------
+
+Fluent builder for constructing message payloads.
+
+.. code-block:: python
+
+   from cascade.utils import MessageBuilder
+
+   builder = (MessageBuilder()
+       .content('Hello!')
+       .embed(embed)
+       .component(button_row)
+       .reply(message_id)
+       .suppress_mentions()
+       .tts()
+       .ephemeral()
+       .sticker(sticker_id))
+   
+   await channel.send(builder)
+
+Methods:
+
+- ``content(text)`` — set message content
+- ``embed(embed)`` — add an embed (accepts :class:`Embed` or dict)
+- ``component(component)`` — add a component row
+- ``reply(message_id, mention=True)`` — reply to a message
+- ``suppress_mentions()`` — suppress all mentions
+- ``tts(enabled=True)`` — enable TTS
+- ``suppress_embeds(enabled=True)`` — suppress embed previews
+- ``ephemeral(enabled=True)`` — make message ephemeral (interactions only)
+- ``nonce(nonce)`` — set message nonce
+- ``sticker(sticker_id)`` — add sticker by ID
+- ``build()`` — return dict payload
+
+``send_message()`` in :class:`RestClient` and entity methods like ``channel.send()`` accept ``MessageBuilder`` directly.
+
+AllowedMentions
+~~~~~~~~~~~~~~~
+
+Control which mentions are parsed.
+
+.. code-block:: python
+
+   from cascade.utils import AllowedMentions
+
+   mentions = AllowedMentions.none()
+   mentions = AllowedMentions.all()
+   
+   mentions = AllowedMentions(
+       users=[user_id],
+       roles=[role_id],
+       everyone=False,
+       replied_user=True
+   )
+
 Permissions
 -----------
 

@@ -34,6 +34,7 @@ API Reference
    api/rest
    api/gateway
    api/entities
+   api/quests
    api/voice
    api/interactions
    api/automod
