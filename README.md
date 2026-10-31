@@ -1,84 +1,135 @@
 # cascade
 
-A modern, high-performance, async-ready API wrapper for Discord's user API written in Python.
+High-performance Discord user API wrapper for Python.
 
-> **Note:** Automating user accounts is against the Discord ToS. This library is for educational purposes only. Use at your own risk.
-
-## Key Features
-
-- Async/await throughout with `aiohttp` and `websockets`
-- Full Discord Gateway v10 with auto-reconnect and resume
-- 120+ REST API endpoints
-- Smart rate limit handling with per-bucket tracking
-- Device and platform spoofing (desktop, mobile, VR, console)
-- Rich presence and activity builder
-- Voice connections with FFmpeg and Opus support
-- Interactions - buttons, select menus, modals
-- Auto-moderation rule management
-- Advanced layered caching (LRU/LFU/FIFO/TTL)
-- Token protection and fingerprint randomization
-- Command framework with prefix support
-
-## Installing
-
-Python 3.10 or higher is required.
+## Install
 
 ```bash
 pip install cascade-discord
 ```
 
-For voice support:
-
+Voice support:
 ```bash
-pip install "cascade-discord[voice]"
+pip install cascade-discord[voice]
 ```
 
-## Quick Example
+## Quick Start
 
 ```python
-import asyncio
-import cascade
+from cascade import Session
 
-async def main():
-    session = cascade.Session(token)
+session = Session('your_token')
 
-    @session.event
-    async def on_ready(user):
-        print(f'Logged in as {user.username}')
+@session.event
+async def on_ready():
+    print(f'{session.user.name} ready')
 
-    @session.event
-    async def on_message(message):
-        if message.content == '!ping':
-            await session.rest.send_message(message.channel_id, 'Pong!')
+@session.event
+async def on_message(message):
+    if message.content == '!ping':
+        await message.reply('pong')
 
-    await session.start()
-
-asyncio.run(main())
+session.run()
 ```
 
-## Bot Example
+## Features
+
+- Full Gateway v10 with reconnect and resume
+- 120+ REST endpoints
+- Rate limit handling with per-bucket tracking
+- Platform spoofing (desktop, mobile, web, console, VR)
+- Rich presence builder
+- Voice support (FFmpeg + Opus)
+- Interactions (buttons, select menus, modals)
+- AutoMod rules
+- Layered caching (LRU/LFU/FIFO/TTL)
+- Token protection and fingerprint randomization
+- Commands framework
+- Quest system with safe heartbeat loops
+- Thread and webhook management
+- Bulk operations
+
+## Examples
+
+### Send Messages
 
 ```python
-from cascade.ext.commands import Bot
+channel = session.get_channel(channel_id)
+await channel.send('hello')
 
-bot = Bot(command_prefix='!', self_bot=True)
-
-@bot.command()
-async def ping(ctx):
-    await ctx.send(f'Pong! {bot.session.gateway.latency:.0f}ms')
-
-bot.run(token)
+user = session.get_user(user_id)
+await user.send('dm')
 ```
+
+### Friend Requests
+
+```python
+await session.send_friend_request('username')
+
+friends = await session.fetch_friends()
+for friend in friends:
+    print(friend.display_name)
+```
+
+### Join Servers
+
+```python
+await session.accept_invite('discord-api')
+```
+
+**Note**: Some servers require captcha verification. You'll get a 400 error with captcha details — handle this in your application.
+
+### Quests
+
+```python
+quests = await session.quests.get_quests()
+active = await session.quests.get_active_quests()
+
+for quest in active:
+    await session.quests.run_heartbeat_loop(quest.id)
+```
+
+### Rich Presence
+
+```python
+from cascade import Activity
+
+activity = Activity.playing('My Game')
+await session.change_presence(status='online', activity=activity)
+```
+
+### Threads
+
+```python
+thread = await channel.create_thread('Thread Name')
+await thread.join()
+await thread.send('first message')
+```
+
+### Webhooks
+
+```python
+webhook = await session.rest.get_webhook(webhook_id)
+await webhook.send('webhook message')
+```
+
+### Bulk Operations
+
+```python
+messages = await channel.fetch_messages(limit=100)
+message_ids = [m.id for m in messages]
+await channel.bulk_delete(message_ids)
+```
+
+## Documentation
+
+[https://cascade-discord.readthedocs.io](https://cascade-discord.readthedocs.io)
 
 ## Links
 
-- [Documentation](https://cascade-discord.readthedocs.io)
-- [PyPI](https://pypi.org/project/cascade-discord)
-- [GitHub](https://github.com/4f2b/cascade)
-
-## Warning
-
-User account automation violates Discord's Terms of Service. Account termination may occur.
+- **GitHub**: [https://github.com/4f2b/cascade](https://github.com/4f2b/cascade)
+- **PyPI**: [https://pypi.org/project/cascade-discord](https://pypi.org/project/cascade-discord)
+- **Docs**: [https://cascade-discord.readthedocs.io](https://cascade-discord.readthedocs.io)
 
 ## License
 
