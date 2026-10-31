@@ -125,7 +125,7 @@ class GatewayShard:
             return self.spoofer.get_user_agent()
         return (
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) discord/1.0.9262 Chrome/136.0.0.0 Electron/42.0.0 Safari/537.36'
+            '(KHTML, like Gecko) discord/1.0.9266 Chrome/148.0.0.0 Electron/42.0.0 Safari/537.36'
         )
 
     async def _send_loop(self) -> None:
@@ -248,7 +248,7 @@ class GatewayShard:
             'device': '',
             'system_locale': 'en-US',
             'browser_user_agent': self._get_user_agent(),
-            'browser_version': '1.0.9262',
+            'browser_version': '1.0.9266',
             'os_version': '10.0.22631',
             'referrer': '',
             'referring_domain': '',

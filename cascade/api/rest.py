@@ -32,7 +32,7 @@ class RestClient:
             'device': '',
             'system_locale': 'en-US',
             'browser_user_agent': self._get_user_agent(),
-            'browser_version': '1.0.9262',
+            'browser_version': '1.0.9266',
             'os_version': '10.0.22631',
             'referrer': '',
             'referring_domain': '',
@@ -48,7 +48,7 @@ class RestClient:
     def _get_user_agent(self) -> str:
         if self.spoofer:
             return self.spoofer.get_user_agent()
-        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9262 Chrome/136.0.0.0 Electron/42.0.0 Safari/537.36'
+        return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9266 Chrome/148.0.0.0 Electron/42.0.0 Safari/537.36'
 
     def _build_headers(self) -> Dict[str, str]:
         return {
@@ -61,7 +61,7 @@ class RestClient:
             'Accept-Encoding': 'gzip, deflate',
             'Referer': 'https://discord.com/channels/@me',
             'Origin': 'https://discord.com',
-            'Sec-Ch-Ua': '"Chromium";v="136", "Not_A Brand";v="24", "Google Chrome";v="136"',
+            'Sec-Ch-Ua': '"Chromium";v="148", "Not_A Brand";v="24", "Google Chrome";v="148"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'empty',
