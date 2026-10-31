@@ -178,6 +178,28 @@ class Guild:
         self._update(data)
         return self
 
+    async def fetch_widget(self) -> dict:
+        return await self._session.rest.get_guild_widget(self.id)
+
+    async def fetch_widget_settings(self) -> dict:
+        return await self._session.rest.get_guild_widget_settings(self.id)
+
+    async def edit_widget(self, enabled: bool = None, channel_id: int = None) -> dict:
+        payload = {}
+        if enabled is not None:
+            payload['enabled'] = enabled
+        if channel_id is not None:
+            payload['channel_id'] = str(channel_id)
+        return await self._session.rest.edit_guild_widget(self.id, **payload)
+
+    async def fetch_vanity_url(self) -> dict:
+        return await self._session.rest.get_guild_vanity_url(self.id)
+
+    async def fetch_preview(self):
+        from .guild_preview import GuildPreview
+        data = await self._session.rest.get_guild_preview(self.id)
+        return GuildPreview(data)
+
     def __str__(self) -> str:
         return self.name
 

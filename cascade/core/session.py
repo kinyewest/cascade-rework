@@ -289,6 +289,19 @@ class Session:
     async def accept_invite(self, code: str) -> Dict[str, Any]:
         return await self.rest.accept_invite(code)
 
+    async def fetch_voice_regions(self) -> List[Any]:
+        from ..entities.voice_region import VoiceRegion
+        data = await self.rest.get_voice_regions()
+        return [VoiceRegion(r) for r in data]
+
+    async def ack_all(self) -> None:
+        guilds = await self.rest.get_user_guilds()
+        for guild in guilds:
+            try:
+                await self.rest.ack_guild(guild['id'])
+            except:
+                pass
+
     async def fetch_oauth2_tokens(self) -> List[Any]:
         from ..oauth2 import OAuth2Token
         data = await self.rest.get_oauth2_tokens()

@@ -385,8 +385,17 @@ class RestClient:
     async def delete_webhook(self, webhook_id: str) -> None:
         await self.delete(f'{BASE}/webhooks/{webhook_id}')
     
-    async def execute_webhook(self, webhook_id: str, token: str, **kwargs) -> None:
-        await self.post(f'{BASE}/webhooks/{webhook_id}/{token}', json=kwargs)
+    async def execute_webhook(self, webhook_id: str, token: str, **kwargs) -> Dict[str, Any]:
+        return await self.post(f'{BASE}/webhooks/{webhook_id}/{token}', json=kwargs)
+
+    async def get_webhook_message(self, webhook_id: str, token: str, message_id: str) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}')
+
+    async def edit_webhook_message(self, webhook_id: str, token: str, message_id: str, **kwargs) -> Dict[str, Any]:
+        return await self.patch(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}', json=kwargs)
+
+    async def delete_webhook_message(self, webhook_id: str, token: str, message_id: str) -> None:
+        await self.delete(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}')
     
     async def get_user_connections(self) -> List[Dict[str, Any]]:
         return await self.get(routes.me_connections())
@@ -1237,6 +1246,9 @@ class RestClient:
 
     async def edit_channel_permission(self, channel_id: str, overwrite_id: str, **kwargs) -> None:
         await self.put(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}', json=kwargs)
+
+    async def edit_channel_permissions(self, channel_id: str, overwrite_id: str, **kwargs) -> None:
+        await self.edit_channel_permission(channel_id, overwrite_id, **kwargs)
 
     async def delete_channel_permission(self, channel_id: str, overwrite_id: str) -> None:
         await self.delete(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}')

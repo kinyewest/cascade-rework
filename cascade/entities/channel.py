@@ -110,6 +110,54 @@ class TextChannel(Channel):
                 await message.delete()
         
         return to_delete
+
+    async def bulk_delete(self, message_ids: List[Union[int, str]]) -> None:
+        ids = [str(m) for m in message_ids]
+        for i in range(0, len(ids), 100):
+            chunk = ids[i:i+100]
+            if len(chunk) > 1:
+                await self._session.rest.bulk_delete_messages(self.id, chunk)
+            elif len(chunk) == 1:
+                await self._session.rest.delete_message(self.id, chunk[0])
+
+    async def create_thread(self, name: str, message_id: int = None, auto_archive_duration: int = 1440, thread_type: int = None) -> 'TextChannel':
+        if message_id:
+            data = await self._session.rest.create_thread_from_message(self.id, str(message_id), name, auto_archive_duration)
+        else:
+            payload = {
+                'name': name,
+                'auto_archive_duration': auto_archive_duration,
+            }
+            if thread_type:
+                payload['type'] = thread_type
+            data = await self._session.rest.create_thread_without_message(self.id, payload)
+        return TextChannel(data, self._session)
+
+    async def edit_permissions(self, target: Union[int, str], allow: int = None, deny: int = None, perm_type: int = None) -> None:
+        target_id = str(target)
+        payload = {}
+        if allow is not None:
+            payload['allow'] = str(allow)
+        if deny is not None:
+            payload['deny'] = str(deny)
+        if perm_type is not None:
+            payload['type'] = perm_type
+        await self._session.rest.edit_channel_permissions(self.id, target_id, **payload)
+
+    async def delete_permissions(self, target: Union[int, str]) -> None:
+        await self._session.rest.delete_channel_permission(self.id, str(target))
+
+    async def add_member(self, user_id: Union[int, str]) -> None:
+        await self._session.rest.add_thread_member(self.id, str(user_id))
+
+    async def remove_member(self, user_id: Union[int, str]) -> None:
+        await self._session.rest.remove_thread_member(self.id, str(user_id))
+
+    async def join(self) -> None:
+        await self._session.rest.join_thread(self.id)
+
+    async def leave(self) -> None:
+        await self._session.rest.leave_thread(self.id)
     
     async def create_invite(self, **kwargs) -> Dict:
         return await self._session.rest.create_channel_invite(self.id, **kwargs)
