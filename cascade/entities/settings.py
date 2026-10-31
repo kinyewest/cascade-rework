@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from ..types.enums import StatusType
 
