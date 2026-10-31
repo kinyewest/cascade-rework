@@ -6,6 +6,10 @@ Format: `## [version] - YYYY-MM-DD`
 
 ---
 
+## [0.4.1] - 2026-10-20
+
+Same as 0.4.0 (republish due to tag conflict).
+
 ## [0.4.0] - 2026-10-20
 
 ### Added
