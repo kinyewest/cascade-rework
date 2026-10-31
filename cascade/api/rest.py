@@ -130,13 +130,30 @@ class RestClient:
 
                     if response.status == 403:
                         error_text = await response.text()
-                        raise Exception(f'Access denied: {error_text}')
+                        from ..exceptions import Forbidden
+                        raise Forbidden(response, error_text)
+                    
+                    if response.status == 404:
+                        error_text = await response.text()
+                        from ..exceptions import NotFound
+                        raise NotFound(response, error_text)
                     
                     if response.status == 401:
                         raise Exception('Authentication failed')
 
                     error_text = await response.text()
-                    raise Exception(f'HTTP {response.status}: {error_text}')
+                    
+                    if response.status == 400:
+                        try:
+                            error_data = json.loads(error_text)
+                            if 'captcha_key' in error_data:
+                                from ..exceptions import CaptchaRequired
+                                raise CaptchaRequired(response, error_text, error_data)
+                        except json.JSONDecodeError:
+                            pass
+                    
+                    from ..exceptions import HTTPException
+                    raise HTTPException(response, error_text)
             
             except asyncio.TimeoutError:
                 if attempt == 4:
