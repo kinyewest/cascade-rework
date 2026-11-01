@@ -86,6 +86,10 @@ class RestClient:
             'X-Debug-Options': 'bugReporterEnabled',
         }
 
+    def __repr__(self) -> str:
+        masked = f"{self.token[:4]}...{self.token[-4:]}" if self.token and len(self.token) > 8 else "***"
+        return f"<RestClient token='{masked}'>"
+
     async def _get_session(self) -> aiohttp.ClientSession:
         if self.session is None or self.session.closed:
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
@@ -113,6 +117,12 @@ class RestClient:
         route: str,
         **kwargs
     ) -> Any:
+        if route.startswith(('http://', 'https://')):
+            from urllib.parse import urlparse
+            hostname = (urlparse(route).hostname or '').lower()
+            if not (hostname == 'discord.com' or hostname.endswith('.discord.com') or hostname == 'discordapp.com' or hostname.endswith('.discordapp.com')):
+                raise ValueError(f"Refusing to dispatch authenticated request to untrusted host: '{hostname}'")
+
         await self.limiter.acquire(route, method)
         session = await self._get_session()
 

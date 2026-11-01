@@ -42,6 +42,9 @@ class GatewayShard:
         self._reconnect_attempts: int = 0
         self._max_reconnect_wait: float = 60.0
 
+    def __repr__(self) -> str:
+        return f"<GatewayShard connected={not self._closed}>" 
+
     async def connect(self, resume: bool = False) -> None:
         async with self._connect_lock:
             await self._do_connect(resume=resume)

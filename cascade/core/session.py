@@ -32,6 +32,19 @@ class Session:
         self._ready = asyncio.Event()
         self.platform = platform
 
+    def __repr__(self) -> str:
+        masked = f"{self.token[:4]}...{self.token[-4:]}" if self.token and len(self.token) > 8 else "***"
+        username = getattr(self.user, 'name', None) if self.user else None
+        return f"<Session user={username!r} platform={self.platform!r} token='{masked}'>"
+
+    @classmethod
+    def from_env(cls, var_name: str = "DISCORD_TOKEN", **kwargs) -> 'Session':
+        import os
+        token = os.environ.get(var_name)
+        if not token:
+            raise ValueError(f"Environment variable '{var_name}' is not set or empty")
+        return cls(token, **kwargs)
+
     def event(self, coro: Callable) -> Callable:
         event_name = coro.__name__
         if not event_name.startswith('on_'):

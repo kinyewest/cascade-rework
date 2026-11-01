@@ -46,10 +46,16 @@ class FFmpegAudio(AudioSource):
         self._create_process()
 
     def _create_process(self):
+        source_str = str(self.source)
+        if not source_str.startswith(('http://', 'https://')):
+            import os
+            if not os.path.exists(source_str):
+                raise FileNotFoundError(f"Audio source file does not exist: '{source_str}'")
+
         args = [
             'ffmpeg',
             '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
-            '-i', str(self.source),
+            '-i', source_str,
             '-f', 's16le',
             '-ar', '48000',
             '-ac', '2',

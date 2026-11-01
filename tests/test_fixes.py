@@ -1,9 +1,11 @@
 import asyncio
+import os
 import unittest
 from unittest.mock import MagicMock, AsyncMock
 
 from cascade.security.token_protection import TokenManager, HAS_CRYPTOGRAPHY
 from cascade.core.dispatch import EventDispatcher
+from cascade.core.session import Session
 from cascade.ext.commands import Bot, check
 from cascade.utils.checks import is_owner, has_role, has_any_role, is_guild, is_dm
 from cascade.exceptions import CheckFailure
@@ -12,6 +14,7 @@ from cascade.gateway.shard import GatewayShard
 from cascade.api.rest import RestClient
 from cascade.security.ratelimit_evasion import SmartRateLimiter
 from cascade.entities.channel import TextChannel
+from cascade.voice.audio import FFmpegAudio
 
 
 class TestTokenProtection(unittest.TestCase):
@@ -64,7 +67,7 @@ class TestEventDispatcher(unittest.IsolatedAsyncioTestCase):
 
 class TestBotSecurity(unittest.IsolatedAsyncioTestCase):
     async def test_selfbot_rejects_unauthorized_users(self):
-        bot = Bot("test_token", command_prefix="!", self_bot=True)
+        bot = Bot("test_token_123456789", command_prefix="!", self_bot=True)
         bot.user = MagicMock(id=111111111111111111)
 
         executed = []
@@ -73,14 +76,12 @@ class TestBotSecurity(unittest.IsolatedAsyncioTestCase):
         async def ping(ctx):
             executed.append(ctx.author.id)
 
-        # Message from stranger
         stranger_msg = MagicMock()
         stranger_msg.author.id = 222222222222222222
         stranger_msg.content = "!ping"
         await bot._on_message(stranger_msg)
         self.assertEqual(executed, [])
 
-        # Message from self
         self_msg = MagicMock()
         self_msg.author.id = 111111111111111111
         self_msg.content = "!ping"
@@ -88,7 +89,7 @@ class TestBotSecurity(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(executed, [111111111111111111])
 
     async def test_bot_checks(self):
-        bot = Bot("test_token", command_prefix="!", self_bot=True, owner_id=111111111111111111)
+        bot = Bot("test_token_123456789", command_prefix="!", self_bot=True, owner_id=111111111111111111)
         bot.user = MagicMock(id=111111111111111111)
 
         executed = []
@@ -103,6 +104,29 @@ class TestBotSecurity(unittest.IsolatedAsyncioTestCase):
         self_msg.content = "!secure"
         await bot._on_message(self_msg)
         self.assertEqual(executed, ["ok"])
+
+    def test_token_masking_in_repr(self):
+        token = "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAuXXXXXX.YYYYYY"
+        bot = Bot(token)
+        session = Session(token)
+        rest = RestClient(token)
+        shard = GatewayShard(token, session)
+
+        for obj in (bot, session, rest):
+            rep = repr(obj)
+            self.assertNotIn(token, rep)
+            self.assertIn("...", rep)
+        self.assertNotIn(token, repr(shard))
+
+    def test_from_env_initialization(self):
+        os.environ["CUSTOM_DISCORD_TOKEN"] = "env_token_value_12345"
+        try:
+            session = Session.from_env("CUSTOM_DISCORD_TOKEN")
+            self.assertEqual(session.token, "env_token_value_12345")
+            bot = Bot.from_env("CUSTOM_DISCORD_TOKEN")
+            self.assertEqual(bot.token, "env_token_value_12345")
+        finally:
+            os.environ.pop("CUSTOM_DISCORD_TOKEN", None)
 
 
 class TestPlatformSpoofer(unittest.TestCase):
@@ -131,7 +155,6 @@ class TestGatewayShardIdentify(unittest.TestCase):
         session.spoofer = PlatformSpoofer("desktop")
         shard = GatewayShard("test_token", session)
 
-        # Build identify data
         payload = {
             'capabilities': 16381,
             'properties': shard._build_client_properties(),
@@ -145,7 +168,6 @@ class TestRestClientSecurity(unittest.IsolatedAsyncioTestCase):
         client.get = AsyncMock()
         client.post = AsyncMock()
 
-        # Attempt path traversal via invite code
         await client.accept_invite("../../users/@me/billing/payment-sources")
         called_url = client.post.call_args[0][0]
         self.assertNotIn("../", called_url)
@@ -157,6 +179,17 @@ class TestRestClientSecurity(unittest.IsolatedAsyncioTestCase):
         res = await client.create_thread_without_message("123", {"name": "test_thread"})
         self.assertEqual(res, {"id": "999"})
         client.create_thread.assert_called_once_with("123", name="test_thread")
+
+    async def test_untrusted_host_rejection(self):
+        client = RestClient("test_token")
+        with self.assertRaises(ValueError):
+            await client.get("https://attacker-webhook.com/leak")
+
+
+class TestAudioSecurity(unittest.TestCase):
+    def test_missing_local_file_rejected(self):
+        with self.assertRaises(FileNotFoundError):
+            FFmpegAudio("non_existent_audio_file_123456.mp3")
 
 
 if __name__ == "__main__":

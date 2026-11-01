@@ -26,6 +26,18 @@ class Bot(Session):
         self.commands: Dict[str, Callable] = {}
         self.dispatcher.register('on_message', self._on_message)
 
+    def __repr__(self) -> str:
+        masked = f"{self.token[:4]}...{self.token[-4:]}" if self.token and len(self.token) > 8 else "***"
+        return f"<Bot prefix={self.command_prefix!r} self_bot={self.self_bot} token='{masked}'>"
+
+    @classmethod
+    def from_env(cls, var_name: str = "DISCORD_TOKEN", **kwargs) -> 'Bot':
+        import os
+        token = os.environ.get(var_name)
+        if not token:
+            raise ValueError(f"Environment variable '{var_name}' is not set or empty")
+        return cls(token, **kwargs)
+
     def command(self, name: Optional[str] = None, *, checks: Optional[List[Callable]] = None):
         def decorator(func: Callable):
             cmd_name = name or getattr(func, '__command_name__', func.__name__)
