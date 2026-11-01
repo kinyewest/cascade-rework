@@ -6,6 +6,18 @@ Format: `## [version] - YYYY-MM-DD`
 
 ---
 
+## [0.4.2] - 2026-10-20
+
+### Added
+- **CaptchaRequired exception** - Properly handle Discord captcha challenges when joining servers
+  - Exposes all captcha details: `captcha_service`, `captcha_sitekey`, `captcha_rqdata`, `captcha_rqtoken`, `captcha_session_id`
+  - Compatible with free solvers like PyPasser (no paid APIs needed)
+- **Exception hierarchy** - Proper HTTP exception classes: `HTTPException`, `Forbidden`, `NotFound`, `CaptchaRequired`
+- **Captcha handling documentation** - Full guide with PyPasser integration examples
+
+### Fixed
+- Removed duplicate `__all__` declaration causing IndentationError
+
 ## [0.4.1] - 2026-10-20
 
 Same as 0.4.0 (republish due to tag conflict).
