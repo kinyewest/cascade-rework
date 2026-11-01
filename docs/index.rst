@@ -72,6 +72,7 @@ Guides
    topics/applications
    topics/polls
    topics/billing
+   topics/captcha
 
 Indices
 -------
