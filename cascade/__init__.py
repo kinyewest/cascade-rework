@@ -2,7 +2,7 @@ __title__ = 'cascade'
 __version__ = '0.4.2'
 __license__ = 'MIT'
 
-from .exceptions import CascadeException, HTTPException, Forbidden, NotFound, CaptchaRequired
+from .exceptions import CascadeException, HTTPException, Forbidden, NotFound, CaptchaRequired, CheckFailure
 from .core.session import Session
 from .core.cache import Cache
 from .core.events import EventManager
@@ -59,12 +59,13 @@ from .utils.intents import Intents
 from .utils.color import Color
 from .utils.validator import is_valid_username, extract_invite_code, parse_message_link
 from .utils.markdown import MarkdownProcessor, bold, italic, underline, strikethrough, code, code_block, spoiler
-from .utils.embed import Embed
+from .utils.embed import Embed, EmbedField, EmbedAuthor, EmbedFooter
 from .utils.message_builder import MessageBuilder, AllowedMentions
 from .utils.activity_builder import RichActivity, ActivityAssets, ActivityTimestamps, ActivityParty, ActivitySecrets, ActivityButton
-from .ext.commands import Bot, Context, command
+from .ext.commands import Bot, Context, command, check
 from .voice import VoiceState, VoiceClient, AudioSource, PCMAudio, FFmpegAudio, OpusEncoder
 from .automod import AutoModRule, AutoModAction, AutoModTriggerMetadata, AutoModTriggerType, AutoModEventType, AutoModActionType, KeywordPresetType
+AutoModKeywordPresetType = KeywordPresetType
 from .interactions import Component, ActionRow, Button, SelectMenu, SelectOption, TextInput, ButtonStyle, ComponentType, TextInputStyle, Modal, Interaction, InteractionType, InteractionResponseType
 from .spoof import PlatformSpoofer, PLATFORM_PRESETS
 from .security import FingerprintRandomizer, SmartRateLimiter, TokenManager
@@ -228,4 +229,6 @@ __all__ = (
     'Forbidden',
     'NotFound',
     'CaptchaRequired',
+    'CheckFailure',
+    'check',
 )

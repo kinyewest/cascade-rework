@@ -162,3 +162,35 @@ class PlatformSpoofer:
             "device": self.properties.get("device", ""),
             "build": str(self.properties.get("client_build_number", "")),
         }
+
+    def get_headers(self, token: str) -> Dict[str, str]:
+        headers = {
+            'Authorization': token,
+            'User-Agent': self.get_user_agent(),
+            'X-Super-Properties': self.get_super_properties(),
+            'Content-Type': 'application/json',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'X-Discord-Locale': 'en-US',
+            'X-Discord-Timezone': 'America/New_York',
+        }
+        os_name = self.properties.get("os", "")
+        if self.platform in ("mobile", "android", "ios", "iphone", "ipad", "vr", "quest"):
+            return headers
+
+        headers['Referer'] = 'https://discord.com/channels/@me'
+        headers['Origin'] = 'https://discord.com'
+        headers['Sec-Fetch-Dest'] = 'empty'
+        headers['Sec-Fetch-Mode'] = 'cors'
+        headers['Sec-Fetch-Site'] = 'same-origin'
+        headers['Sec-Ch-Ua'] = '"Chromium";v="148", "Not_A Brand";v="24", "Google Chrome";v="148"'
+        headers['Sec-Ch-Ua-Mobile'] = '?0'
+        if os_name == "Mac OS X":
+            headers['Sec-Ch-Ua-Platform'] = '"macOS"'
+        elif os_name == "Linux":
+            headers['Sec-Ch-Ua-Platform'] = '"Linux"'
+        else:
+            headers['Sec-Ch-Ua-Platform'] = '"Windows"'
+        headers['X-Debug-Options'] = 'bugReporterEnabled'
+        return headers

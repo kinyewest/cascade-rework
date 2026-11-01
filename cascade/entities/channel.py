@@ -130,7 +130,7 @@ class TextChannel(Channel):
             }
             if thread_type:
                 payload['type'] = thread_type
-            data = await self._session.rest.create_thread_without_message(self.id, payload)
+            data = await self._session.rest.create_thread(self.id, **payload)
         return TextChannel(data, self._session)
 
     async def edit_permissions(self, target: Union[int, str], allow: int = None, deny: int = None, perm_type: int = None) -> None:

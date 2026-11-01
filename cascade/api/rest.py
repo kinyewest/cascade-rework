@@ -6,7 +6,18 @@ import platform
 import random
 import sys
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
+from urllib.parse import quote
+
+def _clean_id(val: Any) -> str:
+    return quote(str(val).strip(), safe='')
+
+def _clean_param(val: Any) -> str:
+    return quote(str(val).strip(), safe='')
+
+def _clean_emoji(emoji: Any) -> str:
+    return quote(str(emoji).strip(), safe=':')
+
 from .ratelimit import RateLimiter
 from . import routes
 
@@ -14,10 +25,10 @@ BASE = routes.BASE
 
 
 class RestClient:
-    def __init__(self, token: str, spoofer=None):
+    def __init__(self, token: str, spoofer=None, limiter=None):
         self.token = token
         self.session: Optional[aiohttp.ClientSession] = None
-        self.limiter = RateLimiter()
+        self.limiter = limiter or RateLimiter()
         self.spoofer = spoofer
         self._super_properties = self._build_super_properties()
         self._headers = self._build_headers()
@@ -51,6 +62,9 @@ class RestClient:
         return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9266 Chrome/148.0.0.0 Electron/42.0.0 Safari/537.36'
 
     def _build_headers(self) -> Dict[str, str]:
+        if self.spoofer and hasattr(self.spoofer, 'get_headers'):
+            return self.spoofer.get_headers(self.token)
+
         return {
             'Authorization': self.token,
             'User-Agent': self._get_user_agent(),
@@ -215,10 +229,10 @@ class RestClient:
     async def trigger_typing(self, channel_id: str) -> None:
         await self.post(routes.channel_typing(channel_id))
 
-    async def pin_message(self, channel_id: str, message_id: str) -> None:
+    async def pin_message(self, channel_id: Union[str, int], message_id: Union[str, int]) -> None:
         await self.put(routes.channel_pin(channel_id, message_id))
 
-    async def unpin_message(self, channel_id: str, message_id: str) -> None:
+    async def unpin_message(self, channel_id: Union[str, int], message_id: Union[str, int]) -> None:
         await self.delete(routes.channel_pin(channel_id, message_id))
 
     async def get_channel(self, channel_id: str) -> Dict[str, Any]:
@@ -249,20 +263,21 @@ class RestClient:
         return await self.post(routes.me_channels(), json={'recipient_id': recipient_id})
 
     async def add_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
-        await self.put(f'{routes.channel_message(channel_id, message_id)}/reactions/{emoji}/@me')
+        await self.put(f'{routes.channel_message(channel_id, message_id)}/reactions/{_clean_emoji(emoji)}/@me')
 
     async def remove_reaction(self, channel_id: str, message_id: str, emoji: str) -> None:
-        await self.delete(f'{routes.channel_message(channel_id, message_id)}/reactions/{emoji}/@me')
+        await self.delete(f'{routes.channel_message(channel_id, message_id)}/reactions/{_clean_emoji(emoji)}/@me')
 
     async def get_gateway(self) -> Dict[str, Any]:
         return await self.get(routes.gateway())
     
-    async def ack_message(self, channel_id: str, message_id: str) -> None:
-        await self.post(f'{routes.channel(channel_id)}/messages/{message_id}/ack', json={
-            'token': None,
+    async def ack_message(self, channel_id: Union[str, int], message_id: Union[str, int], token: Optional[str] = None) -> None:
+        payload = {
+            'token': token,
             'manual': True,
             'mention_count': 0
-        })
+        }
+        await self.post(f'{routes.channel_message(channel_id, message_id)}/ack', json=payload)
     
     async def search_messages(self, channel_id: str, query: str, limit: int = 25) -> Dict[str, Any]:
         params = {
@@ -271,11 +286,11 @@ class RestClient:
         }
         return await self.get(f'{routes.channel(channel_id)}/messages/search', params=params)
     
-    async def get_user_profile(self, user_id: str, guild_id: str = None) -> Dict[str, Any]:
+    async def get_user_profile(self, user_id: Union[str, int], guild_id: Optional[Union[str, int]] = None) -> Dict[str, Any]:
         params = {}
         if guild_id:
-            params['guild_id'] = guild_id
-        return await self.get(f'{routes.user(user_id)}/profile', params=params)
+            params['guild_id'] = _clean_id(guild_id)
+        return await self.get(f'{routes.user(user_id)}/profile', params=params if params else None)
     
     async def get_relationships(self) -> List[Dict[str, Any]]:
         return await self.get(routes.relationships())
@@ -305,10 +320,11 @@ class RestClient:
         await self.delete(f'{routes.me()}/notes/{user_id}')
     
     async def join_guild(self, invite_code: str) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/invites/{invite_code}')
+        return await self.post(f'{BASE}/invites/{_clean_param(invite_code)}')
     
-    async def get_invite(self, invite_code: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/invites/{invite_code}')
+    async def get_invite(self, invite_code: str, with_counts: bool = True, with_expiration: bool = True) -> Dict[str, Any]:
+        code = _clean_param(invite_code)
+        return await self.get(f'{BASE}/invites/{_clean_param(code)}', params={'with_counts': int(with_counts), 'with_expiration': int(with_expiration)})
     
     async def create_guild(self, name: str, icon: str = None) -> Dict[str, Any]:
         payload = {'name': name}
@@ -352,10 +368,10 @@ class RestClient:
         await self.delete(routes.guild_role(guild_id, role_id))
     
     async def add_guild_member_role(self, guild_id: str, user_id: str, role_id: str) -> None:
-        await self.put(f'{routes.guild_member(guild_id, user_id)}/roles/{role_id}')
+        await self.put(f'{routes.guild_member(guild_id, user_id)}/roles/{_clean_id(role_id)}')
     
     async def remove_guild_member_role(self, guild_id: str, user_id: str, role_id: str) -> None:
-        await self.delete(f'{routes.guild_member(guild_id, user_id)}/roles/{role_id}')
+        await self.delete(f'{routes.guild_member(guild_id, user_id)}/roles/{_clean_id(role_id)}')
     
     async def kick_guild_member(self, guild_id: str, user_id: str) -> None:
         await self.delete(routes.guild_member(guild_id, user_id))
@@ -406,13 +422,13 @@ class RestClient:
         return await self.post(f'{BASE}/webhooks/{webhook_id}/{token}', json=kwargs)
 
     async def get_webhook_message(self, webhook_id: str, token: str, message_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}')
+        return await self.get(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{_clean_id(message_id)}')
 
     async def edit_webhook_message(self, webhook_id: str, token: str, message_id: str, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}', json=kwargs)
+        return await self.patch(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{_clean_id(message_id)}', json=kwargs)
 
     async def delete_webhook_message(self, webhook_id: str, token: str, message_id: str) -> None:
-        await self.delete(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{message_id}')
+        await self.delete(f'{BASE}/webhooks/{webhook_id}/{token}/messages/{_clean_id(message_id)}')
     
     async def get_user_connections(self) -> List[Dict[str, Any]]:
         return await self.get(routes.me_connections())
@@ -441,14 +457,14 @@ class RestClient:
     async def remove_group_dm_recipient(self, channel_id: str, user_id: str) -> None:
         await self.delete(f'{routes.channel(channel_id)}/recipients/{user_id}')
     
-    async def get_pinned_messages(self, channel_id: str) -> List[Dict[str, Any]]:
-        return await self.get(f'{routes.channel(channel_id)}/pins')
+    async def get_pinned_messages(self, channel_id: Union[str, int]) -> List[Dict[str, Any]]:
+        return await self.get(routes.channel_pins(channel_id))
     
     async def get_guild_emojis(self, guild_id: str) -> List[Dict[str, Any]]:
         return await self.get(f'{routes.guild(guild_id)}/emojis')
     
     async def get_guild_emoji(self, guild_id: str, emoji_id: str) -> Dict[str, Any]:
-        return await self.get(f'{routes.guild(guild_id)}/emojis/{emoji_id}')
+        return await self.get(f'{routes.guild(guild_id)}/emojis/{_clean_emoji(emoji_id)}')
     
     async def create_guild_emoji(self, guild_id: str, name: str, image: str, **kwargs) -> Dict[str, Any]:
         payload = {'name': name, 'image': image}
@@ -456,16 +472,16 @@ class RestClient:
         return await self.post(f'{routes.guild(guild_id)}/emojis', json=payload)
     
     async def edit_guild_emoji(self, guild_id: str, emoji_id: str, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{routes.guild(guild_id)}/emojis/{emoji_id}', json=kwargs)
+        return await self.patch(f'{routes.guild(guild_id)}/emojis/{_clean_emoji(emoji_id)}', json=kwargs)
     
     async def delete_guild_emoji(self, guild_id: str, emoji_id: str) -> None:
-        await self.delete(f'{routes.guild(guild_id)}/emojis/{emoji_id}')
+        await self.delete(f'{routes.guild(guild_id)}/emojis/{_clean_emoji(emoji_id)}')
     
-    async def get_guild_stickers(self, guild_id: str) -> List[Dict[str, Any]]:
+    async def get_guild_stickers(self, guild_id: Union[str, int]) -> List[Dict[str, Any]]:
         return await self.get(f'{routes.guild(guild_id)}/stickers')
     
-    async def get_guild_sticker(self, guild_id: str, sticker_id: str) -> Dict[str, Any]:
-        return await self.get(f'{routes.guild(guild_id)}/stickers/{sticker_id}')
+    async def get_guild_sticker(self, guild_id: Union[str, int], sticker_id: Union[str, int]) -> Dict[str, Any]:
+        return await self.get(f'{routes.guild(guild_id)}/stickers/{_clean_id(sticker_id)}')
     
     async def get_guild_audit_log(self, guild_id: str, **kwargs) -> Dict[str, Any]:
         return await self.get(f'{routes.guild(guild_id)}/audit-logs', params=kwargs)
@@ -479,7 +495,7 @@ class RestClient:
     async def get_guild_vanity_url(self, guild_id: str) -> Dict[str, Any]:
         return await self.get(f'{routes.guild(guild_id)}/vanity-url')
     
-    async def get_guild_preview(self, guild_id: str) -> Dict[str, Any]:
+    async def get_guild_preview(self, guild_id: Union[str, int]) -> Dict[str, Any]:
         return await self.get(f'{routes.guild(guild_id)}/preview')
     
     async def get_guild_widget(self, guild_id: str) -> Dict[str, Any]:
@@ -491,7 +507,7 @@ class RestClient:
     async def edit_guild_widget(self, guild_id: str, **kwargs) -> Dict[str, Any]:
         return await self.patch(f'{routes.guild(guild_id)}/widget', json=kwargs)
     
-    async def get_guild_welcome_screen(self, guild_id: str) -> Dict[str, Any]:
+    async def get_guild_welcome_screen(self, guild_id: Union[str, int]) -> Dict[str, Any]:
         return await self.get(f'{routes.guild(guild_id)}/welcome-screen')
     
     async def edit_guild_welcome_screen(self, guild_id: str, **kwargs) -> Dict[str, Any]:
@@ -519,9 +535,9 @@ class RestClient:
         params = {'limit': limit}
         if after:
             params['after'] = after
-        return await self.get(f'{routes.channel_message(channel_id, message_id)}/reactions/{emoji}', params=params)
+        return await self.get(f'{routes.channel_message(channel_id, message_id)}/reactions/{_clean_emoji(emoji)}', params=params)
     
-    async def crosspost_message(self, channel_id: str, message_id: str) -> Dict[str, Any]:
+    async def crosspost_message(self, channel_id: Union[str, int], message_id: Union[str, int]) -> Dict[str, Any]:
         return await self.post(f'{routes.channel_message(channel_id, message_id)}/crosspost')
     
     async def follow_news_channel(self, channel_id: str, webhook_channel_id: str) -> Dict[str, Any]:
@@ -587,41 +603,39 @@ class RestClient:
             return await self.get(f'{BASE}/applications/{application_id}/guilds/{guild_id}/commands')
         return await self.get(f'{BASE}/applications/{application_id}/commands')
     
-    async def get_guild_scheduled_events(self, guild_id: str, with_user_count: bool = False) -> List[Dict[str, Any]]:
-        params = {'with_user_count': str(with_user_count).lower()}
-        return await self.get(f'{routes.guild(guild_id)}/scheduled-events', params=params)
+    async def get_guild_scheduled_events(self, guild_id: Union[str, int], with_user_count: bool = False) -> List[Dict[str, Any]]:
+        return await self.get(f'{routes.guild(guild_id)}/scheduled-events', params={'with_user_count': str(with_user_count).lower()})
     
-    async def get_guild_scheduled_event(self, guild_id: str, event_id: str, with_user_count: bool = False) -> Dict[str, Any]:
-        params = {'with_user_count': str(with_user_count).lower()}
-        return await self.get(f'{routes.guild(guild_id)}/scheduled-events/{event_id}', params=params)
+    async def get_guild_scheduled_event(self, guild_id: Union[str, int], event_id: Union[str, int], with_user_count: bool = False) -> Dict[str, Any]:
+        return await self.get(f'{routes.guild(guild_id)}/scheduled-events/{_clean_id(event_id)}', params={'with_user_count': str(with_user_count).lower()})
     
-    async def create_guild_scheduled_event(self, guild_id: str, **kwargs) -> Dict[str, Any]:
+    async def create_guild_scheduled_event(self, guild_id: Union[str, int], **kwargs) -> Dict[str, Any]:
         return await self.post(f'{routes.guild(guild_id)}/scheduled-events', json=kwargs)
     
     async def edit_guild_scheduled_event(self, guild_id: str, event_id: str, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{routes.guild(guild_id)}/scheduled-events/{event_id}', json=kwargs)
+        return await self.patch(f'{routes.guild(guild_id)}/scheduled-events/{_clean_id(event_id)}', json=kwargs)
     
-    async def delete_guild_scheduled_event(self, guild_id: str, event_id: str) -> None:
-        await self.delete(f'{routes.guild(guild_id)}/scheduled-events/{event_id}')
+    async def delete_guild_scheduled_event(self, guild_id: Union[str, int], event_id: Union[str, int]) -> None:
+        await self.delete(f'{routes.guild(guild_id)}/scheduled-events/{_clean_id(event_id)}')
     
-    async def get_guild_scheduled_event_users(self, guild_id: str, event_id: str, limit: int = 100, **kwargs) -> List[Dict[str, Any]]:
-        params = {'limit': limit}
+    async def get_guild_scheduled_event_users(self, guild_id: Union[str, int], event_id: Union[str, int], limit: int = 100, with_member: bool = False, **kwargs) -> List[Dict[str, Any]]:
+        params = {'limit': limit, 'with_member': str(with_member).lower()}
         params.update(kwargs)
-        return await self.get(f'{routes.guild(guild_id)}/scheduled-events/{event_id}/users', params=params)
+        return await self.get(f'{routes.guild(guild_id)}/scheduled-events/{_clean_id(event_id)}/users', params=params)
     
-    async def get_stage_instance(self, channel_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/stage-instances/{channel_id}')
+    async def get_stage_instance(self, channel_id: Union[str, int]) -> Dict[str, Any]:
+        return await self.get(f'{BASE}/stage-instances/{_clean_id(channel_id)}')
     
-    async def create_stage_instance(self, channel_id: str, topic: str, **kwargs) -> Dict[str, Any]:
-        payload = {'channel_id': channel_id, 'topic': topic}
+    async def create_stage_instance(self, channel_id: Union[str, int], topic: str, privacy_level: int = 1, **kwargs) -> Dict[str, Any]:
+        payload = {'channel_id': str(channel_id), 'topic': topic, 'privacy_level': privacy_level}
         payload.update(kwargs)
         return await self.post(f'{BASE}/stage-instances', json=payload)
     
     async def edit_stage_instance(self, channel_id: str, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/stage-instances/{channel_id}', json=kwargs)
+        return await self.patch(f'{BASE}/stage-instances/{_clean_id(channel_id)}', json=kwargs)
     
-    async def delete_stage_instance(self, channel_id: str) -> None:
-        await self.delete(f'{BASE}/stage-instances/{channel_id}')
+    async def delete_stage_instance(self, channel_id: Union[str, int]) -> None:
+        await self.delete(f'{BASE}/stage-instances/{_clean_id(channel_id)}')
     
     async def get_guild_voice_regions(self, guild_id: str) -> List[Dict[str, Any]]:
         return await self.get(f'{routes.guild(guild_id)}/regions')
@@ -633,7 +647,7 @@ class RestClient:
         return await self.get(f'{routes.guild(guild_id)}/invites')
     
     async def delete_invite(self, invite_code: str) -> Dict[str, Any]:
-        return await self.delete(f'{BASE}/invites/{invite_code}')
+        return await self.delete(f'{BASE}/invites/{_clean_param(invite_code)}')
 
     async def get_current_authorization_info(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/oauth2/@me')
@@ -743,8 +757,6 @@ class RestClient:
             'suppress': suppress
         })
 
-    async def get_user_connections(self) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/@me/connections')
     
     async def get_user_settings(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/users/@me/settings')
@@ -752,8 +764,6 @@ class RestClient:
     async def modify_user_settings(self, **settings) -> Dict[str, Any]:
         return await self.patch(f'{BASE}/users/@me/settings', json=settings)
     
-    async def get_user_profile(self, user_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/users/{user_id}/profile')
     
     async def get_user_affinities(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/users/@me/affinities/users')
@@ -764,12 +774,7 @@ class RestClient:
     async def get_experiments(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/experiments')
     
-    async def get_guild_preview(self, guild_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/preview')
     
-    async def ack_message(self, channel_id: str, message_id: str, token: str = None) -> None:
-        payload = {'token': token} if token else {}
-        await self.post(f'{routes.channel_message(channel_id, message_id)}/ack', json=payload if payload else None)
     
     async def ack_guild(self, guild_id: str) -> None:
         await self.post(f'{routes.guild(guild_id)}/ack')
@@ -787,11 +792,6 @@ class RestClient:
     async def delete_mention(self, message_id: str) -> None:
         await self.delete(f'{BASE}/users/@me/mentions/{message_id}')
     
-    async def create_group_dm(self, access_tokens: List[str], nicks: Dict[str, str]) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/users/@me/channels', json={
-            'access_tokens': access_tokens,
-            'nicks': nicks
-        })
     
     async def add_group_recipient(self, channel_id: str, user_id: str, access_token: str = None, nick: str = None) -> None:
         payload = {}
@@ -804,47 +804,50 @@ class RestClient:
     async def remove_group_recipient(self, channel_id: str, user_id: str) -> None:
         await self.delete(f'{routes.channel(channel_id)}/recipients/{user_id}')
     
-    async def search_channel_messages(self, channel_id: str, query: str = None, author_id: str = None, 
-                                     mentions: str = None, has: str = None, min_id: str = None, 
-                                     max_id: str = None, limit: int = 25, offset: int = 0) -> Dict[str, Any]:
+    async def search_channel_messages(self, channel_id: Union[str, int], query: Optional[str] = None, author_id: Optional[Union[str, int]] = None, 
+                                     mentions: Optional[str] = None, has: Optional[str] = None, 
+                                     min_id: Optional[Union[str, int]] = None, max_id: Optional[Union[str, int]] = None, 
+                                     limit: int = 25, offset: int = 0, **kwargs) -> Dict[str, Any]:
         params = {'offset': offset}
         if query:
             params['content'] = query
         if author_id:
-            params['author_id'] = author_id
+            params['author_id'] = _clean_id(author_id)
         if mentions:
             params['mentions'] = mentions
         if has:
             params['has'] = has
         if min_id:
-            params['min_id'] = min_id
+            params['min_id'] = _clean_id(min_id)
         if max_id:
-            params['max_id'] = max_id
+            params['max_id'] = _clean_id(max_id)
         if limit:
             params['limit'] = limit
+        params.update(kwargs)
         return await self.get(f'{routes.channel(channel_id)}/messages/search', params=params)
     
-    async def search_guild_messages(self, guild_id: str, query: str = None, author_id: str = None,
-                                   mentions: str = None, has: str = None, channel_id: str = None,
-                                   min_id: str = None, max_id: str = None, limit: int = 25, 
-                                   offset: int = 0) -> Dict[str, Any]:
+    async def search_guild_messages(self, guild_id: Union[str, int], query: Optional[str] = None, author_id: Optional[Union[str, int]] = None,
+                                   mentions: Optional[str] = None, has: Optional[str] = None, channel_id: Optional[Union[str, int]] = None,
+                                   min_id: Optional[Union[str, int]] = None, max_id: Optional[Union[str, int]] = None, limit: int = 25, 
+                                   offset: int = 0, **kwargs) -> Dict[str, Any]:
         params = {'offset': offset}
         if query:
             params['content'] = query
         if author_id:
-            params['author_id'] = author_id
+            params['author_id'] = _clean_id(author_id)
         if mentions:
             params['mentions'] = mentions
         if has:
             params['has'] = has
         if channel_id:
-            params['channel_id'] = channel_id
+            params['channel_id'] = _clean_id(channel_id)
         if min_id:
-            params['min_id'] = min_id
+            params['min_id'] = _clean_id(min_id)
         if max_id:
-            params['max_id'] = max_id
+            params['max_id'] = _clean_id(max_id)
         if limit:
             params['limit'] = limit
+        params.update(kwargs)
         return await self.get(f'{routes.guild(guild_id)}/messages/search', params=params)
     
     async def get_library(self) -> Dict[str, Any]:
@@ -890,19 +893,19 @@ class RestClient:
         await self.post(f'{BASE}/users/@me/connections/{platform}/{connection_id}/refresh')
 
     async def get_automod_rules(self, guild_id: int) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/auto-moderation/rules')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/auto-moderation/rules')
     
     async def get_automod_rule(self, guild_id: int, rule_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/auto-moderation/rules/{rule_id}')
     
     async def create_automod_rule(self, guild_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/guilds/{guild_id}/auto-moderation/rules', json=kwargs)
+        return await self.post(f'{BASE}/guilds/{_clean_id(guild_id)}/auto-moderation/rules', json=kwargs)
     
     async def modify_automod_rule(self, guild_id: int, rule_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/auto-moderation/rules/{rule_id}', json=kwargs)
     
     async def delete_automod_rule(self, guild_id: int, rule_id: int) -> None:
-        await self.delete(f'{BASE}/guilds/{guild_id}/auto-moderation/rules/{rule_id}')
+        await self.delete(f'{BASE}/guilds/{_clean_id(guild_id)}/auto-moderation/rules/{rule_id}')
     
     async def create_interaction_response(self, interaction_id: int, token: str, **kwargs) -> None:
         await self.post(f'{BASE}/interactions/{interaction_id}/{token}/callback', json=kwargs)
@@ -920,19 +923,19 @@ class RestClient:
         return await self.post(f'{BASE}/webhooks/{application_id}/{token}', json=kwargs)
     
     async def get_followup_message(self, application_id: int, token: str, message_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}')
+        return await self.get(f'{BASE}/webhooks/{application_id}/{token}/messages/{_clean_id(message_id)}')
     
     async def edit_followup_message(self, application_id: int, token: str, message_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}', json=kwargs)
+        return await self.patch(f'{BASE}/webhooks/{application_id}/{token}/messages/{_clean_id(message_id)}', json=kwargs)
     
     async def delete_followup_message(self, application_id: int, token: str, message_id: int) -> None:
-        await self.delete(f'{BASE}/webhooks/{application_id}/{token}/messages/{message_id}')
+        await self.delete(f'{BASE}/webhooks/{application_id}/{token}/messages/{_clean_id(message_id)}')
     
     async def modify_current_user_voice_state(self, guild_id: int, **kwargs) -> None:
-        await self.patch(f'{BASE}/guilds/{guild_id}/voice-states/@me', json=kwargs)
+        await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/voice-states/@me', json=kwargs)
     
     async def modify_user_voice_state(self, guild_id: int, user_id: int, **kwargs) -> None:
-        await self.patch(f'{BASE}/guilds/{guild_id}/voice-states/{user_id}', json=kwargs)
+        await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/voice-states/{user_id}', json=kwargs)
 
     async def get_my_applications(self) -> List[Dict[str, Any]]:
         return await self.get(f'{BASE}/applications')
@@ -989,7 +992,7 @@ class RestClient:
         await self.post(f'{BASE}/teams/{team_id}/members', json=payload)
 
     async def remove_team_member(self, team_id: int, user_id: int) -> None:
-        await self.delete(f'{BASE}/teams/{team_id}/members/{user_id}')
+        await self.delete(f'{BASE}/teams/{team_id}/members/{_clean_id(user_id)}')
 
     async def transfer_team_ownership(self, team_id: int, user_id: int) -> None:
         await self.patch(f'{BASE}/teams/{team_id}', json={'owner_user_id': str(user_id)})
@@ -997,81 +1000,61 @@ class RestClient:
     async def get_team_applications(self, team_id: int) -> List[Dict[str, Any]]:
         return await self.get(f'{BASE}/teams/{team_id}/applications')
 
-    async def accept_friend_request(self, user_id: int) -> None:
-        await self.put(f'{BASE}/users/@me/relationships/{user_id}', json={'type': 1})
+    async def accept_friend_request(self, user_id: Union[str, int]) -> None:
+        await self.put(f'{BASE}/users/@me/relationships/{_clean_id(user_id)}', json={'type': 1})
 
     async def remove_relationship(self, user_id: int) -> None:
-        await self.delete(f'{BASE}/users/@me/relationships/{user_id}')
+        await self.delete(f'{BASE}/users/@me/relationships/{_clean_id(user_id)}')
 
-    async def set_relationship_nickname(self, user_id: int, nickname: Optional[str]) -> None:
-        await self.patch(f'{BASE}/users/@me/relationships/{user_id}', json={'nickname': nickname})
+    async def set_relationship_nickname(self, user_id: Union[str, int], nickname: Optional[str]) -> None:
+        await self.patch(f'{BASE}/users/@me/relationships/{_clean_id(user_id)}', json={'nickname': nickname})
 
-    async def get_mutual_friends(self, user_id: int) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/{user_id}/relationships')
+    async def get_mutual_friends(self, user_id: Union[str, int]) -> List[Dict[str, Any]]:
+        return await self.get(f'{BASE}/users/{_clean_id(user_id)}/relationships')
 
     async def get_relationship(self, user_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/users/@me/relationships/{user_id}')
+        return await self.get(f'{BASE}/users/@me/relationships/{_clean_id(user_id)}')
 
     async def delete_friend_suggestion(self, user_id: int) -> None:
         await self.delete(f'{BASE}/friend-suggestions/{user_id}')
 
-    async def get_guild_scheduled_events(self, guild_id: int, with_user_count: bool = True) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events', params={'with_user_count': int(with_user_count)})
 
-    async def create_guild_scheduled_event(self, guild_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/guilds/{guild_id}/scheduled-events', json=kwargs)
 
-    async def get_guild_scheduled_event(self, guild_id: int, event_id: int, with_user_count: bool = True) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}', params={'with_user_count': int(with_user_count)})
 
     async def modify_guild_scheduled_event(self, guild_id: int, event_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/scheduled-events/{_clean_id(event_id)}', json=kwargs)
 
-    async def delete_guild_scheduled_event(self, guild_id: int, event_id: int) -> None:
-        await self.delete(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}')
 
-    async def get_guild_scheduled_event_users(self, guild_id: int, event_id: int, limit: int = 100, with_member: bool = False) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/scheduled-events/{event_id}/users', params={'limit': limit, 'with_member': int(with_member)})
 
-    async def get_stage_instance(self, channel_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/stage-instances/{channel_id}')
 
-    async def create_stage_instance(self, channel_id: int, topic: str, privacy_level: int = 2, **kwargs) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/stage-instances', json={'channel_id': str(channel_id), 'topic': topic, 'privacy_level': privacy_level, **kwargs})
 
     async def modify_stage_instance(self, channel_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/stage-instances/{channel_id}', json=kwargs)
+        return await self.patch(f'{BASE}/stage-instances/{_clean_id(channel_id)}', json=kwargs)
 
-    async def delete_stage_instance(self, channel_id: int) -> None:
-        await self.delete(f'{BASE}/stage-instances/{channel_id}')
 
     async def list_default_soundboard_sounds(self) -> List[Dict[str, Any]]:
         return await self.get(f'{BASE}/soundboard-default-sounds')
 
     async def list_guild_soundboard_sounds(self, guild_id: int) -> List[Dict[str, Any]]:
-        data = await self.get(f'{BASE}/guilds/{guild_id}/soundboard-sounds')
+        data = await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/soundboard-sounds')
         return data.get('items', data) if isinstance(data, dict) else data
 
     async def create_guild_soundboard_sound(self, guild_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/guilds/{guild_id}/soundboard-sounds', json=kwargs)
+        return await self.post(f'{BASE}/guilds/{_clean_id(guild_id)}/soundboard-sounds', json=kwargs)
 
     async def modify_guild_soundboard_sound(self, guild_id: int, sound_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/soundboard-sounds/{sound_id}', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/soundboard-sounds/{sound_id}', json=kwargs)
 
     async def delete_guild_soundboard_sound(self, guild_id: int, sound_id: int) -> None:
-        await self.delete(f'{BASE}/guilds/{guild_id}/soundboard-sounds/{sound_id}')
+        await self.delete(f'{BASE}/guilds/{_clean_id(guild_id)}/soundboard-sounds/{sound_id}')
 
     async def send_soundboard_sound(self, channel_id: int, sound_id: int, source_guild_id: int = None) -> None:
         payload: Dict[str, Any] = {'sound_id': str(sound_id)}
         if source_guild_id:
             payload['source_guild_id'] = str(source_guild_id)
-        await self.post(f'{BASE}/channels/{channel_id}/send-soundboard-sound', json=payload)
+        await self.post(f'{BASE}/channels/{_clean_id(channel_id)}/send-soundboard-sound', json=payload)
 
-    async def get_guild_stickers(self, guild_id: int) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/stickers')
 
-    async def get_guild_sticker(self, guild_id: int, sticker_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}')
 
     async def create_guild_sticker(self, guild_id: int, name: str, description: str, tags: str, file_data: bytes, filename: str = 'sticker.png') -> Dict[str, Any]:
         import aiohttp as _aiohttp
@@ -1082,33 +1065,33 @@ class RestClient:
         form.add_field('file', file_data, filename=filename)
         session = await self._get_session()
         headers = {k: v for k, v in self._headers.items() if k != 'Content-Type'}
-        async with session.post(f'{BASE}/guilds/{guild_id}/stickers', data=form, headers=headers) as resp:
+        async with session.post(f'{BASE}/guilds/{_clean_id(guild_id)}/stickers', data=form, headers=headers) as resp:
             return await resp.json()
 
     async def modify_guild_sticker(self, guild_id: int, sticker_id: int, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/stickers/{_clean_id(sticker_id)}', json=kwargs)
 
     async def delete_guild_sticker(self, guild_id: int, sticker_id: int) -> None:
-        await self.delete(f'{BASE}/guilds/{guild_id}/stickers/{sticker_id}')
+        await self.delete(f'{BASE}/guilds/{_clean_id(guild_id)}/stickers/{_clean_id(sticker_id)}')
 
     async def get_sticker(self, sticker_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/stickers/{sticker_id}')
+        return await self.get(f'{BASE}/stickers/{_clean_id(sticker_id)}')
 
     async def list_sticker_packs(self) -> List[Dict[str, Any]]:
         data = await self.get(f'{BASE}/sticker-packs')
         return data.get('sticker_packs', []) if isinstance(data, dict) else data
 
     async def create_poll_answer(self, channel_id: str, message_id: str, answer_id: int) -> None:
-        await self.put(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}', json={})
+        await self.put(f'{BASE}/channels/{_clean_id(channel_id)}/polls/{message_id}/answers/{answer_id}', json={})
 
     async def delete_poll_answer(self, channel_id: str, message_id: str, answer_id: int) -> None:
-        await self.delete(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}')
+        await self.delete(f'{BASE}/channels/{_clean_id(channel_id)}/polls/{message_id}/answers/{answer_id}')
 
     async def get_poll_answer_voters(self, channel_id: str, message_id: str, answer_id: int, limit: int = 25) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/channels/{channel_id}/polls/{message_id}/answers/{answer_id}', params={'limit': limit})
+        return await self.get(f'{BASE}/channels/{_clean_id(channel_id)}/polls/{message_id}/answers/{answer_id}', params={'limit': limit})
 
     async def end_poll(self, channel_id: str, message_id: str) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/channels/{channel_id}/polls/{message_id}/expire', json={})
+        return await self.post(f'{BASE}/channels/{_clean_id(channel_id)}/polls/{message_id}/expire', json={})
 
     async def get_read_states(self) -> List[Dict[str, Any]]:
         data = await self.get(f'{BASE}/users/@me/read-states')
@@ -1117,16 +1100,12 @@ class RestClient:
         return data or []
 
     async def ack_channel(self, channel_id: int) -> None:
-        await self.post(f'{BASE}/channels/{channel_id}/messages/ack', json={'token': None})
+        await self.post(f'{BASE}/channels/{_clean_id(channel_id)}/messages/ack', json={'token': None})
 
     async def ack_all_channels(self, guild_id: int) -> None:
-        await self.post(f'{BASE}/guilds/{guild_id}/ack', json={})
+        await self.post(f'{BASE}/guilds/{_clean_id(guild_id)}/ack', json={})
 
-    async def get_billing_subscriptions(self) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/@me/billing/subscriptions')
 
-    async def get_billing_payment_sources(self) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/@me/billing/payment-sources')
 
     async def get_billing_payments(self, limit: int = 20) -> List[Dict[str, Any]]:
         return await self.get(f'{BASE}/users/@me/billing/payments', params={'limit': limit})
@@ -1172,134 +1151,105 @@ class RestClient:
         return await self.patch(f'{BASE}/users/@me/guilds/{guild_id}/settings', json=payload)
 
     async def get_guild_member_profile(self, guild_id: int, user_id: int) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/members/{user_id}/profile')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/members/{_clean_id(user_id)}/profile')
 
     async def accept_invite(self, code: str) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/invites/{code}', json={'session_id': None})
+        return await self.post(f'{BASE}/invites/{_clean_param(code)}', json={'session_id': None})
 
-    async def get_invite(self, code: str, with_counts: bool = True, with_expiration: bool = True) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/invites/{code}', params={'with_counts': int(with_counts), 'with_expiration': int(with_expiration)})
 
-    async def get_guild_welcome_screen(self, guild_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}/welcome-screen')
 
     async def edit_welcome_screen(self, guild_id: str, payload: dict) -> dict:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/welcome-screen', json=payload)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/welcome-screen', json=payload)
 
     async def get_guild_onboarding(self, guild_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}/onboarding')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/onboarding')
 
     async def edit_guild_onboarding(self, guild_id: str, payload: dict) -> dict:
-        return await self.put(f'{BASE}/guilds/{guild_id}/onboarding', json=payload)
+        return await self.put(f'{BASE}/guilds/{_clean_id(guild_id)}/onboarding', json=payload)
 
     async def get_guild_templates(self, guild_id: str) -> list:
-        return await self.get(f'{BASE}/guilds/{guild_id}/templates')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/templates')
 
     async def create_guild_template(self, guild_id: str, name: str, description: str = None) -> dict:
         payload = {'name': name}
         if description is not None:
             payload['description'] = description
-        return await self.post(f'{BASE}/guilds/{guild_id}/templates', json=payload)
+        return await self.post(f'{BASE}/guilds/{_clean_id(guild_id)}/templates', json=payload)
 
     async def sync_guild_template(self, guild_id: str, code: str) -> dict:
-        return await self.put(f'{BASE}/guilds/{guild_id}/templates/{code}')
+        return await self.put(f'{BASE}/guilds/{_clean_id(guild_id)}/templates/{code}')
 
     async def edit_guild_template(self, guild_id: str, code: str, **kwargs) -> dict:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/templates/{code}', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/templates/{code}', json=kwargs)
 
     async def delete_guild_template(self, guild_id: str, code: str) -> dict:
-        return await self.delete(f'{BASE}/guilds/{guild_id}/templates/{code}')
+        return await self.delete(f'{BASE}/guilds/{_clean_id(guild_id)}/templates/{code}')
 
     async def get_template(self, code: str) -> dict:
-        return await self.get(f'{BASE}/guilds/templates/{code}')
+        return await self.get(f'{BASE}/guilds/templates/{_clean_param(code)}')
 
     async def create_guild_from_template(self, code: str, name: str, icon: str = None) -> dict:
         payload = {'name': name}
         if icon:
             payload['icon'] = icon
-        return await self.post(f'{BASE}/guilds/templates/{code}', json=payload)
+        return await self.post(f'{BASE}/guilds/templates/{_clean_param(code)}', json=payload)
 
     async def get_guild_ban(self, guild_id: str, user_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}/bans/{user_id}')
-        payload: dict = {}
-        if guild_id:
-            payload['guild_id'] = guild_id
-        if channel_id:
-            payload['channel_id'] = channel_id
-        if channel_type is not None:
-            payload['channel_type'] = channel_type
-        return await self.post(f'{BASE}/invites/{code}', json=payload)
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/bans/{_clean_id(user_id)}')
 
     async def get_guild_member_count(self, guild_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}', params={'with_counts': 'true'})
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}', params={'with_counts': 'true'})
 
-    async def get_user_affinities(self) -> dict:
-        return await self.get(f'{BASE}/users/@me/affinities/users')
 
-    async def get_guild_affinities(self) -> dict:
-        return await self.get(f'{BASE}/users/@me/affinities/guilds')
 
     async def create_forum_post(self, channel_id: str, payload: dict) -> dict:
-        return await self.post(f'{BASE}/channels/{channel_id}/threads', json=payload)
+        return await self.post(f'{BASE}/channels/{_clean_id(channel_id)}/threads', json=payload)
 
     async def set_voice_channel_status(self, channel_id: str, status: str) -> None:
-        await self.put(f'{BASE}/channels/{channel_id}/voice-status', json={'status': status})
+        await self.put(f'{BASE}/channels/{_clean_id(channel_id)}/voice-status', json={'status': status})
 
-    async def search_guild_messages(self, guild_id: str, query: str, **kwargs) -> dict:
-        params = {'content': query}
-        params.update(kwargs)
-        return await self.get(f'{BASE}/guilds/{guild_id}/messages/search', params=params)
 
-    async def search_channel_messages(self, channel_id: str, query: str, **kwargs) -> dict:
-        params = {'content': query}
-        params.update(kwargs)
-        return await self.get(f'{BASE}/channels/{channel_id}/messages/search', params=params)
 
     async def get_guild_discovery_requirements(self, guild_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}/discovery-requirements')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/discovery-requirements')
 
     async def get_channel_permissions(self, channel_id: str) -> list:
-        return await self.get(f'{BASE}/channels/{channel_id}/permissions')
+        return await self.get(f'{BASE}/channels/{_clean_id(channel_id)}/permissions')
 
     async def edit_channel_permission(self, channel_id: str, overwrite_id: str, **kwargs) -> None:
-        await self.put(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}', json=kwargs)
+        await self.put(f'{BASE}/channels/{_clean_id(channel_id)}/permissions/{_clean_id(overwrite_id)}', json=kwargs)
 
     async def edit_channel_permissions(self, channel_id: str, overwrite_id: str, **kwargs) -> None:
         await self.edit_channel_permission(channel_id, overwrite_id, **kwargs)
 
     async def delete_channel_permission(self, channel_id: str, overwrite_id: str) -> None:
-        await self.delete(f'{BASE}/channels/{channel_id}/permissions/{overwrite_id}')
+        await self.delete(f'{BASE}/channels/{_clean_id(channel_id)}/permissions/{_clean_id(overwrite_id)}')
 
-    async def get_guild_member_verification(self, guild_id: str) -> dict:
-        return await self.get(f'{BASE}/guilds/{guild_id}/member-verification')
+    async def get_guild_member_verification(self, guild_id: Union[str, int], with_guild: bool = False, invite_code: Optional[str] = None) -> Dict[str, Any]:
+        params: Dict[str, Any] = {'with_guild': str(with_guild).lower()}
+        if invite_code:
+            params['invite_code'] = _clean_param(invite_code)
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/member-verification', params=params)
 
     async def agree_guild_rules(self, guild_id: str, form_fields: list, version: str) -> dict:
         return await self.put(
-            f'{BASE}/guilds/{guild_id}/requests/@me',
+            f'{BASE}/guilds/{_clean_id(guild_id)}/requests/@me',
             json={'form_fields': form_fields, 'version': version},
         )
 
     async def get_guild_application_commands(self, guild_id: str, application_id: str) -> list:
-        return await self.get(f'{BASE}/guilds/{guild_id}/application-command-index')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/application-command-index')
 
     async def suppress_embeds(self, channel_id: str, message_id: str, suppress: bool = True) -> dict:
         flags = 4 if suppress else 0
-        return await self.patch(f'{BASE}/channels/{channel_id}/messages/{message_id}', json={'flags': flags})
+        return await self.patch(f'{BASE}/channels/{_clean_id(channel_id)}/messages/{_clean_id(message_id)}', json={'flags': flags})
 
-    async def crosspost_message(self, channel_id: str, message_id: str) -> dict:
-        return await self.post(f'{BASE}/channels/{channel_id}/messages/{message_id}/crosspost')
 
-    async def pin_message(self, channel_id: str, message_id: str) -> None:
-        await self.put(f'{BASE}/channels/{channel_id}/pins/{message_id}')
 
-    async def unpin_message(self, channel_id: str, message_id: str) -> None:
-        await self.delete(f'{BASE}/channels/{channel_id}/pins/{message_id}')
 
-    async def get_pinned_messages(self, channel_id: str) -> list:
-        return await self.get(f'{BASE}/channels/{channel_id}/pins')
 
     async def bulk_ban_members(self, guild_id: str, user_ids: List[str], delete_message_seconds: int = 86400) -> Dict[str, Any]:
-        return await self.post(f'{BASE}/guilds/{guild_id}/bulk-ban', json={
+        return await self.post(f'{BASE}/guilds/{_clean_id(guild_id)}/bulk-ban', json={
             'user_ids': user_ids,
             'delete_message_seconds': delete_message_seconds,
         })
@@ -1332,16 +1282,10 @@ class RestClient:
         }
         if guild_id:
             params['guild_id'] = guild_id
-        return await self.get(f'{BASE}/users/{user_id}/profile', params=params)
+        return await self.get(f'{BASE}/users/{_clean_id(user_id)}/profile', params=params)
 
-    async def get_mutual_friends(self, user_id: str) -> List[Dict[str, Any]]:
-        return await self.get(f'{BASE}/users/{user_id}/relationships')
 
-    async def set_relationship_nickname(self, user_id: str, nickname: str) -> None:
-        await self.patch(f'{BASE}/users/@me/relationships/{user_id}', json={'nickname': nickname})
 
-    async def accept_friend_request(self, user_id: str) -> None:
-        await self.put(f'{BASE}/users/@me/relationships/{user_id}', json={})
 
     async def get_proto_settings(self, type: int) -> Dict[str, Any]:
         return await self.get(f'{BASE}/users/@me/settings-proto/{type}')
@@ -1362,43 +1306,38 @@ class RestClient:
         await self.delete(f'{BASE}/users/@me/avatars/{avatar_id}')
 
     async def accept_message_request(self, channel_id: str) -> Dict[str, Any]:
-        return await self.put(f'{BASE}/channels/{channel_id}/recipients/@me', json={'consent_status': 2})
+        return await self.put(f'{BASE}/channels/{_clean_id(channel_id)}/recipients/@me', json={'consent_status': 2})
 
     async def decline_message_request(self, channel_id: str) -> None:
-        await self.delete(f'{BASE}/channels/{channel_id}/recipients/@me')
+        await self.delete(f'{BASE}/channels/{_clean_id(channel_id)}/recipients/@me')
 
     async def mark_message_request(self, channel_id: str) -> Dict[str, Any]:
-        return await self.put(f'{BASE}/channels/{channel_id}/recipients/@me', json={'consent_status': 1})
+        return await self.put(f'{BASE}/channels/{_clean_id(channel_id)}/recipients/@me', json={'consent_status': 1})
 
     async def send_greet(self, channel_id: str, sticker_id: str, message_id: str = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {'sticker_ids': [sticker_id]}
         if message_id:
             payload['message_reference'] = {'message_id': message_id}
-        return await self.post(f'{BASE}/channels/{channel_id}/greet', json=payload)
+        return await self.post(f'{BASE}/channels/{_clean_id(channel_id)}/greet', json=payload)
 
     async def get_channel_affinities(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/users/@me/affinities/channels')
 
-    async def get_guild_member_verification(self, guild_id: str, with_guild: bool = False, invite_code: str = None) -> Dict[str, Any]:
-        params: Dict[str, Any] = {'with_guild': str(with_guild).lower()}
-        if invite_code:
-            params['invite_code'] = invite_code
-        return await self.get(f'{BASE}/guilds/{guild_id}/member-verification', params=params)
 
     async def submit_guild_join_request(self, guild_id: str, form_fields: List[Dict], version: str = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {'form_fields': form_fields}
         if version:
             payload['version'] = version
-        return await self.put(f'{BASE}/guilds/{guild_id}/requests/@me', json=payload)
+        return await self.put(f'{BASE}/guilds/{_clean_id(guild_id)}/requests/@me', json=payload)
 
     async def get_own_join_request(self, guild_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/requests/@me')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/requests/@me')
 
     async def delete_join_request(self, guild_id: str) -> None:
-        await self.delete(f'{BASE}/guilds/{guild_id}/requests/@me')
+        await self.delete(f'{BASE}/guilds/{_clean_id(guild_id)}/requests/@me')
 
     async def get_join_request_cooldown(self, guild_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/requests/@me/cooldown')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/requests/@me/cooldown')
 
     async def get_guild_join_requests(self, guild_id: str, status: str, limit: int = 100, before: str = None, after: str = None) -> Dict[str, Any]:
         params: Dict[str, Any] = {'status': status, 'limit': limit}
@@ -1406,7 +1345,7 @@ class RestClient:
             params['before'] = before
         if after:
             params['after'] = after
-        return await self.get(f'{BASE}/guilds/{guild_id}/requests', params=params)
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/requests', params=params)
 
     async def get_premium_usage(self) -> Dict[str, Any]:
         return await self.get(f'{BASE}/users/@me/premium-usage')
@@ -1415,13 +1354,16 @@ class RestClient:
         return await self.get(f'{BASE}/users/@me/billing/country-code')
 
     async def get_guild_profile(self, guild_id: str) -> Dict[str, Any]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/profile')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/profile')
 
     async def edit_guild_profile(self, guild_id: str, **kwargs) -> Dict[str, Any]:
-        return await self.patch(f'{BASE}/guilds/{guild_id}/profile', json=kwargs)
+        return await self.patch(f'{BASE}/guilds/{_clean_id(guild_id)}/profile', json=kwargs)
 
     async def get_user_top_read_channels(self, guild_id: str) -> List[str]:
-        return await self.get(f'{BASE}/guilds/{guild_id}/top-read-channels')
+        return await self.get(f'{BASE}/guilds/{_clean_id(guild_id)}/top-read-channels')
 
     async def get_detectable_applications(self) -> List[Dict[str, Any]]:
         return await self.get(f'{BASE}/applications/detectable')
+
+    async def create_thread_without_message(self, channel_id: Union[str, int], payload: Dict[str, Any]) -> Dict[str, Any]:
+        return await self.create_thread(channel_id, **payload)

@@ -22,3 +22,6 @@ class CaptchaRequired(HTTPException):
         self.captcha_rqdata = data.get('captcha_rqdata')
         self.captcha_rqtoken = data.get('captcha_rqtoken')
         self.captcha_session_id = data.get('captcha_session_id')
+
+class CheckFailure(CascadeException):
+    pass

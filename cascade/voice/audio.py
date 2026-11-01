@@ -48,7 +48,8 @@ class FFmpegAudio(AudioSource):
     def _create_process(self):
         args = [
             'ffmpeg',
-            '-i', self.source,
+            '-protocol_whitelist', 'file,http,https,tcp,tls,crypto',
+            '-i', str(self.source),
             '-f', 's16le',
             '-ar', '48000',
             '-ac', '2',

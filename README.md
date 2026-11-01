@@ -127,7 +127,7 @@ await channel.bulk_delete(message_ids)
 
 ## Links
 
-- **GitHub**: [https://github.com/4f2b/cascade](https://github.com/4f2b/cascade)
+- **GitHub**: [https://github.com/kinyewest/cascade-rework](https://github.com/kinyewest/cascade-rework)
 - **PyPI**: [https://pypi.org/project/cascade-discord](https://pypi.org/project/cascade-discord)
 - **Docs**: [https://cascade-discord.readthedocs.io](https://cascade-discord.readthedocs.io)
 

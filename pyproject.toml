@@ -37,11 +37,11 @@ security = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/4f2b/cascade"
+Homepage = "https://github.com/kinyewest/cascade-rework"
 Documentation = "https://cascade-discord.readthedocs.io"
-Repository = "https://github.com/4f2b/cascade"
-Issues = "https://github.com/4f2b/cascade/issues"
-Changelog = "https://github.com/4f2b/cascade/blob/main/CHANGELOG.md"
+Repository = "https://github.com/kinyewest/cascade-rework"
+Issues = "https://github.com/kinyewest/cascade-rework/issues"
+Changelog = "https://github.com/kinyewest/cascade-rework/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["cascade*"]

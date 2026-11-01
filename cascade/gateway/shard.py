@@ -225,7 +225,6 @@ class GatewayShard:
                         'private_channels_version': '0',
                         'api_code_version': 0,
                     },
-                    'intents': self._calculate_intents(),
                 }
             })
 

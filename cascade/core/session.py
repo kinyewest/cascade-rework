@@ -9,12 +9,23 @@ from ..spoof import PlatformSpoofer
 
 
 class Session:
-    def __init__(self, token: str, *, message_cache_limit: int = 1000, platform: str = "desktop"):
+    def __init__(
+        self,
+        token: str,
+        *,
+        message_cache_limit: int = 1000,
+        platform: str = "desktop",
+        smart_ratelimit: bool = False,
+    ):
         self.token = token
         self.cache = Cache(message_limit=message_cache_limit)
         self.dispatcher = EventDispatcher()
         self.spoofer = PlatformSpoofer(platform)
-        self.rest = RestClient(token, spoofer=self.spoofer)
+        from ..security.fingerprint import FingerprintRandomizer
+        from ..security.ratelimit_evasion import SmartRateLimiter
+        self.fingerprint = FingerprintRandomizer()
+        limiter = SmartRateLimiter() if smart_ratelimit else None
+        self.rest = RestClient(token, spoofer=self.spoofer, limiter=limiter)
         self.gateway: Optional[GatewayShard] = None
         self.user: Optional[Any] = None
         self._closed = False
